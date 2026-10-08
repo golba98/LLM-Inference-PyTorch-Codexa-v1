@@ -1,6 +1,7 @@
 """Interact with a Codexa conversational checkpoint through native inference."""
 
 from __future__ import annotations
+from llm_inference.cli.paths import asset_path, generated_path
 
 import argparse
 from pathlib import Path
@@ -35,7 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional system message. Omit it to match user-first SFT records.",
     )
     parser.add_argument("--memory", choices=("off", "ephemeral", "persistent"), default="off")
-    parser.add_argument("--memory-path", type=Path, default=Path("data/memory/codexa.sqlite3"))
+    parser.add_argument("--memory-path", type=Path, default=generated_path('data/memory/codexa.sqlite3'))
     parser.add_argument("--memory-device", choices=("cpu", "cuda"), default="cpu")
     parser.add_argument("--memory-threshold", type=float, default=0.68)
     parser.add_argument("--user-id", default="local")

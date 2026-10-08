@@ -1,4 +1,5 @@
 """Export a separately named native model and verify source/export equivalence."""
+from llm_inference.cli.paths import asset_path, generated_path
 
 import argparse
 import gc
@@ -59,7 +60,7 @@ def main() -> None:
     """Run the explicit command-line operation with validated inputs."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--checkpoint', type=Path, required=True)
-    parser.add_argument('--tokenizer', type=Path, default=Path('checkpoints/tokenizer-base-v1/tokenizer.json'))
+    parser.add_argument('--tokenizer', type=Path, default=asset_path('checkpoints/tokenizer-base-v1/tokenizer.json'))
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     print(json.dumps(export_native(args.checkpoint, args.tokenizer, args.output)))
