@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from collections.abc import Callable
 
 import torch
 
@@ -44,8 +45,11 @@ class NativeChatEngine:
         no_repeat_ngram_size: int | None = None,
         do_sample: bool = True,
         seed: int = 42,
+        expected_checkpoint_sha256: str | None = None,
     ) -> None:
-        payload = read_native_checkpoint(checkpoint)
+        payload = (read_native_checkpoint(checkpoint, model_only=True)
+                   if expected_checkpoint_sha256 is None else
+                   read_native_checkpoint(checkpoint, model_only=True, expected_sha256=expected_checkpoint_sha256))
         if not isinstance(payload, dict):
             raise ValueError("Checkpoint payload must be an object.")
         config = payload.get("config")
@@ -127,7 +131,9 @@ class NativeChatEngine:
         """Release optional memory resources."""
         self.memory.close()
 
-    def reply(self, user_text: str) -> tuple[str, GeneratedSequence]:
+    def reply(self, user_text: str, *, token_callback: Callable[[int], None] | None = None,
+              context_callback: Callable[[object], None] | None = None,
+              preserve_whitespace: bool = False) -> tuple[str, GeneratedSequence]:
         """Generate one response and append the completed turn to history."""
 
         clean_text = user_text.strip()
@@ -146,6 +152,8 @@ class NativeChatEngine:
                                 self.generation_config.max_new_tokens)
         self.memory.status.update(references=context.references, memory_tokens=context.memory_tokens)
         prompt_ids = context.ids
+        if context_callback is not None:
+            context_callback(context)
         try:
             generated = generate_sequences(
                 self.model,
@@ -154,12 +162,15 @@ class NativeChatEngine:
                 pad_token_id=self.pad_token_id,
                 stop_sequences=[[self.end_token_id]],
                 config=self.generation_config,
+                token_callback=token_callback,
             ).sequences[0]
             response = self.tokenizer.decode(
                 list(generated.visible_token_ids),
                 skip_special_tokens=True,
-            ).strip()
-            if not response:
+            )
+            if not preserve_whitespace:
+                response = response.strip()
+            if not response and not preserve_whitespace:
                 raise ValueError("Model generated an empty response.")
             self.messages.extend([ChatMessage("user", clean_text), ChatMessage("assistant", response)])
             self.memory.remember(clean_text, response)

@@ -37,6 +37,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--memory-device", choices=("cpu", "cuda"), default="cpu")
     parser.add_argument("--memory-threshold", type=float, default=0.68)
     parser.add_argument("--user-id", default="local")
+    parser.add_argument("--protocol-version", choices=(1, 2), type=int, default=1)
+    parser.add_argument("--model-id")
+    parser.add_argument("--expected-checkpoint-sha256")
+    parser.add_argument("--expected-tokenizer-sha256")
     return parser
 
 
@@ -50,6 +54,35 @@ def main() -> None:
     """Load one model and process native chat requests until stdin closes."""
 
     arguments = build_parser().parse_args()
+    if arguments.protocol_version == 2:
+        from contextlib import redirect_stdout
+        import hmac
+        import time
+        from llm_architecture.checkpointing import file_sha256
+        from llm_inference.bridge_protocol import emit as emit_v2, preflight, serve
+        started = time.perf_counter()
+        try:
+            if not all((arguments.model_id, arguments.expected_checkpoint_sha256,
+                        arguments.expected_tokenizer_sha256)):
+                raise ValueError("Protocol v2 requires model and checkpoint/tokenizer identities.")
+            emit_v2(dict(type="status", stage="resource-check"))
+            preflight(arguments.device)
+            emit_v2(dict(type="status", stage="verifying-checkpoint"))
+            tokenizer_digest = file_sha256(arguments.tokenizer)
+            if not hmac.compare_digest(tokenizer_digest, arguments.expected_tokenizer_sha256):
+                raise ValueError("Tokenizer identity does not match the registry.")
+            emit_v2(dict(type="status", stage="loading-model"))
+            with redirect_stdout(sys.stderr):
+                engine = NativeChatEngine(checkpoint=arguments.checkpoint, tokenizer_path=arguments.tokenizer,
+                    device=arguments.device, maximum_new_tokens=128, do_sample=False,
+                    expected_checkpoint_sha256=arguments.expected_checkpoint_sha256,
+                    memory=create_memory(mode="off"))
+            serve(engine, model_id=arguments.model_id, checkpoint_sha256=arguments.expected_checkpoint_sha256,
+                  tokenizer_sha256=tokenizer_digest, startup_seconds=time.perf_counter()-started)
+        except Exception as error:
+            emit_v2(dict(type="error", id="", message=str(error), error_type=type(error).__name__))
+            raise SystemExit(1) from None
+        return
     engine = NativeChatEngine(
         checkpoint=arguments.checkpoint,
         tokenizer_path=arguments.tokenizer,
