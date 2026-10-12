@@ -11,7 +11,7 @@ import time
 
 import torch
 
-from llm_architecture.checkpointing import file_sha256, verify_checkpoint_checksum
+from llm_architecture.checkpointing import file_sha256, verify_checkpoint_checksum, read_native_checkpoint
 from llm_inference.native_chat import NativeChatEngine
 
 
@@ -20,7 +20,7 @@ def export_native(checkpoint: Path, tokenizer: Path, output: Path, *, smoke: boo
     if output.resolve().is_relative_to(checkpoint.parent.resolve()):
         raise ValueError('Export must be separate from the training directory.')
     source_hash = verify_checkpoint_checksum(checkpoint)
-    source = torch.load(checkpoint, map_location='cpu', weights_only=False, mmap=True)
+    source = read_native_checkpoint(checkpoint, map_location='cpu')
     tokenizer_hash = file_sha256(tokenizer)
     if source.get('tokenizer_sha256') != tokenizer_hash:
         raise ValueError('Export requires a matching tokenizer fingerprint.')
