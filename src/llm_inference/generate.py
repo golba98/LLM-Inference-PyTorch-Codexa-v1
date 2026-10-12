@@ -349,6 +349,8 @@ def generate_sequences(
                 else:
                     logits, _loss = model(generated)
                 next_logits = logits[:, -1, :].float()
+                if not torch.isfinite(next_logits).all():
+                    raise FloatingPointError("Generation logits contain NaN or Infinity.")
                 next_logits = apply_repetition_penalty(
                     next_logits,
                     generated,
