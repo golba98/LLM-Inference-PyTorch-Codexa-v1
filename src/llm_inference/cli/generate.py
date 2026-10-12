@@ -13,7 +13,7 @@ import torch
 
 
 
-from llm_architecture.checkpointing import load_model_checkpoint, verify_checkpoint_checksum, checkpoint_model_config
+from llm_architecture.checkpointing import load_model_checkpoint, verify_checkpoint_checksum, checkpoint_model_config, read_native_checkpoint
 _checkpoint_model_config = checkpoint_model_config
 from llm_inference.generate import (
     GenerationConfig,
@@ -102,7 +102,7 @@ def run(arguments: argparse.Namespace) -> dict[str, object]:
         # checksum verification performed above.
         if "Unsupported checkpoint format" not in str(error):
             raise
-        payload = torch.load(arguments.checkpoint, map_location=device, weights_only=False)
+        payload = read_native_checkpoint(arguments.checkpoint, map_location=device)
         if not isinstance(payload, dict) or not isinstance(payload.get("model_state_dict"), dict):
             raise
         model.load_state_dict(payload["model_state_dict"], strict=True)

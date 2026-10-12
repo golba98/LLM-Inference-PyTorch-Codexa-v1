@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from llm_architecture.checkpointing import read_native_checkpoint
+
 import argparse
 import json
 from pathlib import Path
@@ -24,7 +26,7 @@ def main() -> None:
     if args.output.exists():
         shutil.rmtree(args.output)
     args.output.mkdir(parents=True)
-    payload = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
+    payload = read_native_checkpoint(args.checkpoint, map_location="cpu")
     state = payload["model_state_dict"]
     raw_config = payload["config"]
     config = raw_config.get("model", raw_config)

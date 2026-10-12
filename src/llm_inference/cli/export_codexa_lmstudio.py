@@ -7,6 +7,8 @@ and uses the supported GPT-2 runtime metadata so LM Studio can load the model.
 
 from __future__ import annotations
 
+from llm_architecture.checkpointing import read_native_checkpoint
+
 import argparse
 import json
 from pathlib import Path
@@ -62,7 +64,7 @@ def export(checkpoint: Path, tokenizer: Path, output: Path, converter: Path) -> 
     if output.exists():
         shutil.rmtree(output)
     output.mkdir(parents=True)
-    payload = torch.load(checkpoint, map_location="cpu", weights_only=False)
+    payload = read_native_checkpoint(checkpoint, map_location="cpu")
     state = payload["model_state_dict"]
     raw_config = payload["config"]
     config = raw_config.get("model", raw_config)
